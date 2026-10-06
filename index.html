@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Self-Sorting Cells</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Cell-view sorting · after Zhang, Goldstein &amp; Levin (2024)</span>
+    <h1>Self-Sorting Cells</h1>
+    <p class="lede">Every number in the array is its own agent following one local rule (Bubble, Insertion or Selection). No cell can see another cell's rule. Watch what the population does anyway.</p>
+  </header>
+
+  <div class="grid">
+    <main class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="presetTitle">Clustering: Bubble + Selection</h2>
+        <div class="row">
+          <button class="primary" id="run">Run</button>
+          <button id="stepBtn">Step</button>
+          <button id="reset">New array</button>
+        </div>
+      </div>
+      <canvas id="strip" aria-label="Array of cells: bar height is value, colour is algotype"></canvas>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--bubble)"></i>Bubble</span>
+        <span><i class="sw" style="background:var(--insertion)"></i>Insertion</span>
+        <span><i class="sw" style="background:var(--selection)"></i>Selection</span>
+        <span><i class="sw" style="background:var(--frozen)"></i>Frozen (damaged)</span>
+        <span>Strip below the bars: colour tag of each cell, so clusters are easy to see</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="sSwaps">0</b><span>swaps</span></div>
+        <div class="stat"><b id="sSorted">–</b><span>sortedness (adjacent pairs)</span></div>
+        <div class="stat"><b id="sInv">–</b><span>inversions fixed</span></div>
+        <div class="stat"><b id="sAgg">–</b><span>clustering now</span></div>
+        <div class="stat"><b id="sPeak">–</b><span>peak clustering (chance <span id="sChance">–</span>)</span></div>
+        <div class="stat"><b id="sDips">–</b><span>backward steps (pairs metric / inversions)</span></div>
+      </div>
+      <h3>Progress toward the goal</h3>
+      <canvas id="traceSort" class="trace"></canvas>
+      <div class="legend"><span><i class="sw" style="background:var(--accent)"></i>Sortedness: share of adjacent pairs in order</span><span><i class="sw" style="background:var(--good)"></i>Inversion-based progress</span></div>
+      <h3>Clustering by algotype</h3>
+      <canvas id="traceAgg" class="trace"></canvas>
+      <div class="legend"><span><i class="sw" style="background:var(--selection)"></i>Share of neighbouring pairs with the same algotype</span><span><i class="sw" style="background:var(--chance)"></i>Expected by chance</span></div>
+    </main>
+
+    <aside class="panel">
+      <h2>Experiments</h2>
+      <div class="presets" id="presets"></div>
+      <h3>Population</h3>
+      <div class="ctl"><span>Cells</span><output id="nOut"></output><input type="range" id="n" min="20" max="200" step="10" value="100"></div>
+      <div class="ctl"><span>Bubble share</span><output id="mbOut"></output><input type="range" id="mb" min="0" max="100" value="50"></div>
+      <div class="ctl"><span>Insertion share</span><output id="miOut"></output><input type="range" id="mi" min="0" max="100" value="0"></div>
+      <div class="ctl"><span>Selection share</span><output id="msOut"></output><input type="range" id="ms" min="0" max="100" value="50"></div>
+      <div class="ctl"><span>Distinct values (0 = all unique)</span><output id="vrOut"></output><input type="range" id="vr" min="0" max="50" value="0"></div>
+      <h3>Damage</h3>
+      <div class="ctl"><span>Frozen cells</span><output id="fzOut"></output><input type="range" id="fz" min="0" max="10" value="0"></div>
+      <label>Frozen type
+        <select id="ft"><option value="movable">Movable: can't act, can be pushed</option><option value="immovable">Immovable: can't act or be moved</option></select>
+      </label>
+      <h3>Goals</h3>
+      <label class="check"><input type="checkbox" id="dB"> Bubble cells sort descending</label>
+      <label class="check"><input type="checkbox" id="dI"> Insertion cells sort descending</label>
+      <label class="check"><input type="checkbox" id="dS"> Selection cells sort descending</label>
+      <h3>Control</h3>
+      <label class="check"><input type="checkbox" id="ctrl"> Tags only: colours assigned as above, but every cell runs Bubble</label>
+      <div class="ctl"><span>Speed (cell actions per frame)</span><output id="spOut"></output><input type="range" id="sp" min="1" max="400" value="40"></div>
+      <h3>Batch</h3>
+      <div class="row"><button id="batch">Run 40 trials</button><span class="note" id="batchNote"></span></div>
+      <canvas id="traceBatch" class="trace" style="height:130px"></canvas>
+      <p class="note">Mean clustering against normalised progress (0 = start, 1 = sorted), with chance as the grey line.</p>
+    </aside>
+  </div>
+
+  <section class="panel prose">
+    <h2>How the simulation works</h2>
+    <p>Each cell holds a value and an algotype. In every round, cells act once each, in random order, which stands in for the parallel threads in the paper.</p>
+    <p><b>Bubble</b> cells compare themselves with a random neighbour and swap if out of order. <b>Insertion</b> cells move left only when everything to their left is already sorted. <b>Selection</b> cells keep a target position starting at the far left, swap with whoever is there if that cell should come after them, and otherwise move the target one step right.</p>
+    <p>The run ends when a full round changes nothing. Frozen cells never act. Movable frozen cells can still be swapped by others; immovable ones block swaps.</p>
+    <p class="callout">Things to try. Run the batch on Bubble + Selection, then tick the control and run it again: the clustering hump should vanish. Add frozen cells and compare the two progress traces. The pairs metric dips. Inversions never go backwards, because every swap here exchanges an out-of-order pair. Whether the system "goes backwards" depends on how you measure progress.</p>
+  </section>
+</div>
+
+<script src="src/engine.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
